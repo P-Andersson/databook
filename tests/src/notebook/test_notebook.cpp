@@ -6,6 +6,8 @@
 
 import databook;
 
+using namespace databook;
+
 TEMPLATE_TEST_CASE("write notebook primitive integer tests", "", int, char, int8_t, int16_t, int32_t, int64_t, uint8_t, uint16_t, uint32_t)
 {
 	auto inner = std::make_unique<WritingNotebookMemory>();
@@ -48,6 +50,24 @@ TEMPLATE_TEST_CASE("write notebook primitive integer tests", "", int, char, int8
 
 		REQUIRE(std::holds_alternative<TestType>(test_tree->children.at("mytest")));
 		REQUIRE(value == std::get<TestType>(test_tree->children.at("mytest")));
+	}
+}
+
+TEMPLATE_TEST_CASE("load notebook primitive integer tests", "", int, char, int8_t, int16_t, int32_t, int64_t, uint8_t, uint16_t, uint32_t)
+{
+	auto root_node = std::make_shared<MemoryNode>();
+	
+	SECTION("Basic") {
+		TestType value = 4;
+		root_node->children.emplace("mytest", value);
+
+		new LoadingNotebookMemory(std::move(root_node));
+		//auto inner = std::make_unique<LoadingNotebookMemory>(std::move(root_node));
+		/*Notebook notebook(std::move(inner));
+
+		TestType target = 1;
+		notebook.load("mytest", target);
+		REQUIRE(target == value);*/
 	}
 }
 
@@ -154,7 +174,7 @@ namespace {
 		std::string val2;
 		bool val3;
 
-		void store(Notebook& archive) const {
+		void store(Notebook& archive) {
 			archive.write("val1", val1);
 			archive.write("val2", val2);
 			archive.write("val3", val3);
@@ -167,19 +187,45 @@ namespace {
 
 		std::strong_ordering operator<=>(const Composite& other) const = default;
 	};
-}
 
-TEST_CASE("write notebook composite test")
-{
 	static_assert(MemberFunctionStorable<Composite, Notebook>);
 	static_assert(MemberFunctionLoadable<Composite, Notebook>);
 
+	class CompositeSerializeable {
+	public:
+		CompositeSerializeable(int val1, std::string val2, bool val3)
+			: val1(val1)
+			, val2(val2)
+			, val3(val3) {
+
+		}
+
+		int val1;
+		std::string val2;
+		bool val3;
+
+		void serialize(Notebook& archive) {
+			archive.serialize("val1", val1);
+			archive.serialize("val2", val2);
+			archive.serialize("val3", val3);
+		}
+
+		std::strong_ordering operator<=>(const CompositeSerializeable& other) const = default;
+	};
+
+	static_assert(MemberFunctionSerializable<CompositeSerializeable, Notebook>);
+	static_assert(MemberFunctionSerializable<CompositeSerializeable, Notebook>);
+}
+
+TEMPLATE_TEST_CASE("notebook composite tests", "", Composite, CompositeSerializeable)
+{
 	auto inner = std::make_unique<WritingNotebookMemory>();
 	auto test_tree = inner->data();
 	Notebook notebook(std::move(inner));
 
-	SECTION("Composite") {
-		Composite value(65, "sad apple", true);
+	SECTION("Write") {
+
+		TestType value(65, "sad apple", true);
 		notebook.write("mytest", value);
 
 		REQUIRE(std::holds_alternative<std::shared_ptr<MemoryNode>>(test_tree->children.at("mytest")));
